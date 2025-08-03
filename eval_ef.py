@@ -113,18 +113,21 @@ def main():
                 for i, p in enumerate(preds):
                     f.write(f"{fname},{i},{p:.4f}\n")
 
+        yhat_std = np.array([np.sqrt(np.mean(v)) for v in al_vars])  # mean aleatoric std per sample
+
         fig = plt.figure(figsize=(3, 3))
-        plt.scatter(y, yhat_mean, color="k", s=1)
-        plt.plot([0, 100], [0, 100], linewidth=1, linestyle="--")
+        plt.errorbar(y, yhat_mean, yerr=2 * yhat_std, fmt='o', markersize=2, ecolor='gray', alpha=0.5, capsize=2, label='±2σ')
+        plt.plot([0, 100], [0, 100], linewidth=1, linestyle="--", color="red")
         plt.xlabel("Actual EF (%)")
         plt.ylabel("Predicted EF (%)")
         plt.grid(True)
+        plt.legend(loc="upper left", fontsize=8)
         plt.tight_layout()
-        plt.savefig(os.path.join(args.output, f"{split}_scatter.pdf"))
+        plt.savefig(os.path.join(args.output, f"{split}_scatter_uncertainty.pdf"))
         plt.close(fig)
 
-        corr, _ = spearmanr(abs_errors, al_vars)
-        print(f"Spearman correlation between |error| and aleatoric uncertainty: {corr:.3f}")
+        # corr, _ = spearmanr(abs_errors, al_vars)
+        # print(f"Spearman correlation between |error| and aleatoric uncertainty: {corr}")
 
 
 if __name__ == '__main__':

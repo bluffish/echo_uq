@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import sklearn.metrics
 from scipy.stats import spearmanr
 
-from echo import Echo, get_mean_and_std
+from echo import *
 from model import HeteroscedasticEFModel
 
 
@@ -21,7 +21,7 @@ def main():
     parser.add_argument('--weights_path', type=str, required=True)
     parser.add_argument('--model_name', type=str, default='r2plus1d_18')
     parser.add_argument('--num_workers', type=int, default=4)
-    parser.add_argument('--batch_size', type=int, default=1)
+    parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--device', type=str, default=None)
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--frames', type=int, default=32)
@@ -66,6 +66,9 @@ def main():
     mean, std = get_mean_and_std(Echo(root=args.data_dir, split="train"))
     kwargs = {"target_type": "EF", "mean": mean, "std": std, "length": args.frames, "period": args.period}
 
+    mean_y, std_y = get_label_mean_and_std(Echo(root=args.data_dir, split="train"))
+    print(f"Mean: {mean_y}, Std: {std_y}")
+
     for split in ["val", "test"]:
         dataset = Echo(root=args.data_dir, split=split, **kwargs)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=False, pin_memory=(device.type == "cuda"))
@@ -79,10 +82,13 @@ def main():
                     b, c, f, h, w = x.shape if len(x.shape) == 5 else x.shape[1:]
                     x = x.view(-1, c, f, h, w)
 
-                    yhat, epistemic_var, aleatoric_logvar = model(x)
+                    yhat, epistemic_var, var = model(x)
+                    yhat = yhat * float(std_y) + float(mean_y)
+                    var = var * (float(std_y) ** 2)
+
                     yhat = yhat.view(-1).cpu().numpy()
                     abs_errors.append(np.abs(yhat.mean() - y.mean()))
-                    al_vars.append(torch.exp(aleatoric_logvar).view(-1).cpu().numpy())
+                    al_vars.append(var.view(-1).cpu().numpy())
                     ep_vars.append(epistemic_var.view(-1).cpu().numpy())
 
                     print(yhat)

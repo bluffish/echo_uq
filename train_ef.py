@@ -30,6 +30,7 @@ def main():
     parser.add_argument('--frames', type=int, default=32)
     parser.add_argument('--period', type=int, default=2)
     parser.add_argument('--device', type=str, default="cuda")
+    parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--num_workers', type=int, default=4)
     args = parser.parse_args()
 
@@ -39,8 +40,8 @@ def main():
 
     device = torch.device(args.device if args.device else ("cuda" if torch.cuda.is_available() else "cpu"))
 
-    torch.manual_seed(0)
-    np.random.seed(0)
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
 
     base_model = torchvision.models.video.__dict__[args.model_name](pretrained=args.pretrained)
     model = HeteroscedasticEFModel(base_model)

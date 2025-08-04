@@ -17,6 +17,8 @@ from model import HeteroscedasticEFModel
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_dir', type=str, default="/n/netscratch/pfister_lab/Everyone/bowen/EchoNet-Dynamic")    
+    parser.add_argument('--output', type=str, default="./output")
+
     parser.add_argument('--weights_path', type=str, required=True)
     parser.add_argument('--model_name', type=str, default='r2plus1d_18')
     parser.add_argument('--num_workers', type=int, default=4)

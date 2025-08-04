@@ -18,7 +18,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_dir', type=str, default="/n/netscratch/pfister_lab/Everyone/bowen/EchoNet-Dynamic")    
     parser.add_argument('--output', type=str, default="./output")
-
     parser.add_argument('--weights_path', type=str, required=True)
     parser.add_argument('--model_name', type=str, default='r2plus1d_18')
     parser.add_argument('--num_workers', type=int, default=4)
@@ -80,7 +79,7 @@ def main():
         with torch.no_grad():
             with tqdm.tqdm(total=len(dataloader)) as pbar:
                 for x, y in dataloader:
-                    X, y = X.to(device), y.to(device)
+                    x, y = x.to(device), y.to(device)
                     y = (y - float(mean_y)) / float(std_y)
 
                     mean, ep_var, var = model(x)
@@ -106,7 +105,7 @@ def main():
                 for i, p in enumerate(preds):
                     f.write(f"{fname},{i},{p:.4f}\n")
 
-        yhat_std = np.array([np.sqrt(np.mean(v)) for v in al_vars])  # mean aleatoric std per sample
+        yhat_std = np.array([np.sqrt(v) for v in al_vars])  # mean aleatoric std per sample
 
         fig = plt.figure(figsize=(3, 3))
         plt.errorbar(targets, preds, yerr=2 * yhat_std, fmt='o', markersize=2, ecolor='gray', alpha=0.5, capsize=2, label='±2σ')

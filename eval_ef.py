@@ -100,6 +100,7 @@ def main():
         preds = np.concatenate(preds)
         targets = np.concatenate(targets)
         al_vars = np.concatenate(al_vars)
+        abs_errors = np.concatenate(abs_errors)
 
         r2 = sklearn.metrics.r2_score(targets, preds)
         mae = sklearn.metrics.mean_absolute_error(targets, preds)

@@ -94,7 +94,7 @@ def main():
                     targets.append(y.detach().cpu().numpy())
                     al_vars.append(var[:, 0].detach().cpu().numpy())
                     ep_vars.append(ep_var.detach().cpu().numpy())
-
+                    abs_errors.append(np.abs(mean[:, 0].detach().cpu().numpy() - y.detach().cpu().numpy()))
                     pbar.update()
                     
         preds = np.concatenate(preds)

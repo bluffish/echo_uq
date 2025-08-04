@@ -125,8 +125,12 @@ def main():
         plt.savefig(os.path.join(args.output, f"{split}_scatter_uncertainty.pdf"))
         plt.close(fig)
 
-        # corr, _ = spearmanr(abs_errors, al_vars)
-        # print(f"Spearman correlation between |error| and aleatoric uncertainty: {corr}")
+        spearman_corr, spearman_p = spearmanr(yhat_std, abs_errors)
+        print(f"{split} Spearman correlation between uncertainty and absolute error: r = {spearman_corr:.3f}, p = {spearman_p:.3g}")
+
+        # Optional: Pearson correlation as well
+        pearson_corr = np.corrcoef(yhat_std, abs_errors)[0, 1]
+        print(f"{split} Pearson correlation between uncertainty and absolute error: r = {pearson_corr:.3f}")
 
 
 if __name__ == '__main__':

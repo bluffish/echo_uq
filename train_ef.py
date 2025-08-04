@@ -86,11 +86,6 @@ def main():
                     mean, var = model(X)
                     loss = beta_nll_loss(mean, var, y)
 
-                    print(mean)
-                    print(var)
-                    print(y)
-                    print(loss)
-                    print("---")
 
                     if phase == 'train':
                         optim.zero_grad()

@@ -18,6 +18,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_dir', type=str, default="/n/netscratch/pfister_lab/Everyone/bowen/EchoNet-Dynamic")    
     parser.add_argument('--output', type=str, default="./output")
+
     parser.add_argument('--weights_path', type=str, required=True)
     parser.add_argument('--model_name', type=str, default='r2plus1d_18')
     parser.add_argument('--num_workers', type=int, default=4)
@@ -80,19 +81,25 @@ def main():
             with tqdm.tqdm(total=len(dataloader)) as pbar:
                 for x, y in dataloader:
                     x, y = x.to(device), y.to(device)
-                    y = (y - float(mean_y)) / float(std_y)
+                    #y = (y - float(mean_y)) / float(std_y)
 
                     mean, ep_var, var = model(x)
+                    
+                    mean = mean * float(std_y) + float(mean_y)
+                    var = var * float(std_y) ** 2
 
-                    preds.append(mean.detach().cpu().numpy())
+                    print(var)
+
+                    preds.append(mean[:, 0].detach().cpu().numpy())
                     targets.append(y.detach().cpu().numpy())
-                    al_vars.append(var.detach().cpu().numpy())
+                    al_vars.append(var[:, 0].detach().cpu().numpy())
                     ep_vars.append(ep_var.detach().cpu().numpy())
 
                     pbar.update()
                     
         preds = np.concatenate(preds)
         targets = np.concatenate(targets)
+        al_vars = np.concatenate(al_vars)
 
         r2 = sklearn.metrics.r2_score(targets, preds)
         mae = sklearn.metrics.mean_absolute_error(targets, preds)
@@ -100,13 +107,13 @@ def main():
 
         print(f"{split} R2: {r2:.3f}, MAE: {mae:.2f}, RMSE: {rmse:.2f}")
 
-        with open(os.path.join(args.output, f"{split}_predictions.csv"), "w") as f:
-            for fname, preds in zip(dataset.fnames, preds):
-                for i, p in enumerate(preds):
-                    f.write(f"{fname},{i},{p:.4f}\n")
-
+#        with open(os.path.join(args.output, f"{split}_predictions.csv"), "w") as f:
+#            for fname, preds in zip(dataset.fnames, preds):
+#                for i, p in enumerate(preds):
+#                    f.write(f"{fname},{i},{p:.4f}\n")
+#
         yhat_std = np.array([np.sqrt(v) for v in al_vars])  # mean aleatoric std per sample
-
+        print(targets.shape, preds.shape, yhat_std.shape)
         fig = plt.figure(figsize=(3, 3))
         plt.errorbar(targets, preds, yerr=2 * yhat_std, fmt='o', markersize=2, ecolor='gray', alpha=0.5, capsize=2, label='±2σ')
         plt.plot([0, 100], [0, 100], linewidth=1, linestyle="--", color="red")

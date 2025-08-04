@@ -119,7 +119,7 @@ def main():
                 }, os.path.join(args.output, 'best_loss.pt'))
 
             if phase == 'val' and r2 > best_r2:
-                best_loss = running_loss
+                best_r2 = r2
                 torch.save({
                     'epoch': epoch,
                     'state_dict': model.state_dict(),
@@ -128,6 +128,13 @@ def main():
                     'loss': best_loss,
                 }, os.path.join(args.output, 'best_r2.pt'))
 
+            torch.save({
+                'epoch': epoch,
+                'state_dict': model.state_dict(),
+                'optimizer': optim.state_dict(),
+                'scheduler': scheduler.state_dict(),
+                'loss': best_loss,
+            }, os.path.join(args.output, 'latest.pt'))
 
 if __name__ == '__main__':
     main()

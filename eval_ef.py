@@ -16,8 +16,7 @@ from model import HeteroscedasticEFModel
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_dir', type=str, default="../data/EchoNet-Dynamic")
-    parser.add_argument('--output', type=str, default="./test")
+    parser.add_argument('--data_dir', type=str, default="/n/netscratch/pfister_lab/Everyone/bowen/EchoNet-Dynamic")    
     parser.add_argument('--weights_path', type=str, required=True)
     parser.add_argument('--model_name', type=str, default='r2plus1d_18')
     parser.add_argument('--num_workers', type=int, default=4)
@@ -50,6 +49,7 @@ def main():
         model = torch.nn.DataParallel(model).to(device)
         checkpoint = torch.load(path)
         model.load_state_dict(checkpoint['state_dict'])
+        print(checkpoint['epoch'])
         model.eval()
         return model
 
@@ -59,7 +59,7 @@ def main():
     device = torch.device(args.device if args.device else ("cuda" if torch.cuda.is_available() else "cpu"))
     os.makedirs(args.output, exist_ok=True)
 
-    weight_paths = [os.path.join(args.weights_path, f"{i}/best.pt") for i in range(args.num)]
+    weight_paths = [os.path.join(args.weights_path, f"{i}/best_r2.pt") for i in range(args.num)]
     models = [load_model(p) for p in weight_paths]
     model = EnsembleModel(models).to(device)
 
@@ -73,50 +73,41 @@ def main():
         dataset = Echo(root=args.data_dir, split=split, **kwargs)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=False, pin_memory=(device.type == "cuda"))
 
-        all_preds, all_targets, al_vars, ep_vars, abs_errors = [], [], [], [], []
+        preds, targets, al_vars, ep_vars, abs_errors = [], [], [], [], []
 
         with torch.no_grad():
             with tqdm.tqdm(total=len(dataloader)) as pbar:
                 for x, y in dataloader:
-                    x = x.to(device)
-                    b, c, f, h, w = x.shape if len(x.shape) == 5 else x.shape[1:]
-                    x = x.view(-1, c, f, h, w)
+                    X, y = X.to(device), y.to(device)
+                    y = (y - float(mean_y)) / float(std_y)
 
-                    yhat, epistemic_var, var = model(x)
-                    yhat = yhat * float(std_y) + float(mean_y)
-                    var = var * (float(std_y) ** 2)
+                    mean, ep_var, var = model(x)
 
-                    yhat = yhat.view(-1).cpu().numpy()
-                    abs_errors.append(np.abs(yhat.mean() - y.mean()))
-                    al_vars.append(var.view(-1).cpu().numpy())
-                    ep_vars.append(epistemic_var.view(-1).cpu().numpy())
+                    preds.append(mean.detach().cpu().numpy())
+                    targets.append(y.detach().cpu().numpy())
+                    al_vars.append(var.detach().cpu().numpy())
+                    ep_vars.append(ep_var.detach().cpu().numpy())
 
-                    print(yhat)
-                    print(y)
-                    print("---")
-
-                    all_preds.append(yhat)
-                    all_targets.append(y.numpy()[0])
                     pbar.update()
+                    
+        preds = np.concatenate(preds)
+        targets = np.concatenate(targets)
 
-        yhat_mean = np.array([pred.mean() for pred in all_preds])
-        y = np.array(all_targets)
-
-        r2 = sklearn.metrics.r2_score(y, yhat_mean)
-        mae = sklearn.metrics.mean_absolute_error(y, yhat_mean)
-        rmse = np.sqrt(sklearn.metrics.mean_squared_error(y, yhat_mean))
+        r2 = sklearn.metrics.r2_score(targets, preds)
+        mae = sklearn.metrics.mean_absolute_error(targets, preds)
+        rmse = np.sqrt(sklearn.metrics.mean_squared_error(targets, preds))
 
         print(f"{split} R2: {r2:.3f}, MAE: {mae:.2f}, RMSE: {rmse:.2f}")
 
         with open(os.path.join(args.output, f"{split}_predictions.csv"), "w") as f:
-            for fname, preds in zip(dataset.fnames, all_preds):
+            for fname, preds in zip(dataset.fnames, preds):
                 for i, p in enumerate(preds):
                     f.write(f"{fname},{i},{p:.4f}\n")
 
         yhat_std = np.array([np.sqrt(np.mean(v)) for v in al_vars])  # mean aleatoric std per sample
 
         fig = plt.figure(figsize=(3, 3))
-        plt.errorbar(y, yhat_mean, yerr=2 * yhat_std, fmt='o', markersize=2, ecolor='gray', alpha=0.5, capsize=2, label='±2σ')
+        plt.errorbar(targets, preds, yerr=2 * yhat_std, fmt='o', markersize=2, ecolor='gray', alpha=0.5, capsize=2, label='±2σ')
         plt.plot([0, 100], [0, 100], linewidth=1, linestyle="--", color="red")
         plt.xlabel("Actual EF (%)")
         plt.ylabel("Predicted EF (%)")

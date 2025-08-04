@@ -17,7 +17,7 @@ from model import *
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_dir', type=str, default="../data/EchoNet-Dynamic")
+    parser.add_argument('--data_dir', type=str, default="/n/netscratch/pfister_lab/Everyone/bowen/EchoNet-Dynamic")
     parser.add_argument('--output', type=str, default="./output")
     parser.add_argument('--model_name', type=str, default='r2plus1d_18')
     parser.add_argument('--pretrained', action='store_true')
@@ -73,7 +73,9 @@ def main():
     print(f"Mean: {mean_y}, Std: {std_y}")
 
     for epoch in range(args.num_epochs):
-        for phase, loader in [('train', train_loader), ('val', val_loader)]:
+        for phase, loader in [('val', val_loader), ('train', train_loader)]:
+
+        # for phase, loader in [('train', train_loader), ('val', val_loader)]:
             model.train(phase == 'train')
             running_loss, preds, targets = 0.0, [], []
             with torch.set_grad_enabled(phase == 'train'):

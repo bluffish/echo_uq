@@ -77,10 +77,9 @@ def main():
         for phase, loader in [('train', train_loader), ('val', val_loader)]:
             model.train(phase == 'train')
             running_loss, preds, targets = 0.0, [], []
-            loss = 0.0
             
             with torch.set_grad_enabled(phase == 'train'):
-                for X, y in tqdm.tqdm(loader, desc=f"Epoch {epoch} [{phase}] (loss={loss})"):
+                for X, y in tqdm.tqdm(loader, desc=f"Epoch {epoch} [{phase}]"):
                     X, y = X.to(device), y.to(device)
 
                     mean = model(X)
@@ -94,7 +93,9 @@ def main():
                     running_loss += loss.item() * X.size(0)
                     preds.append(mean.detach().cpu().numpy())
                     targets.append(y.detach().cpu().numpy())
-
+                    
+                    print(loss.item())
+                    
             scheduler.step() if phase == 'train' else None
 
             preds = np.concatenate(preds)

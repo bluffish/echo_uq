@@ -94,8 +94,6 @@ def main():
 
                 mean, var = model(x)
                 
-                mean = mean * float(std_y) + float(mean_y)
-
                 preds.append(mean[:, 0].detach().cpu().numpy())
                 targets.append(y.detach().cpu().numpy())
                 vars.append(var[:, 0].detach().cpu().numpy())

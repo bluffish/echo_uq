@@ -24,7 +24,7 @@ def main():
     parser.add_argument('--weights', type=str, default=None)
     parser.add_argument('--num_epochs', type=int, default=45)
     parser.add_argument('--batch_size', type=int, default=8)
-    parser.add_argument('--lr', type=float, default=1e-3)
+    parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--weight_decay', type=float, default=1e-4)
     parser.add_argument('--lr_step_period', type=int, default=15)
     parser.add_argument('--frames', type=int, default=32)
@@ -80,7 +80,6 @@ def main():
             with torch.set_grad_enabled(phase == 'train'):
                 for X, y in tqdm.tqdm(loader, desc=f"Epoch {epoch} [{phase}]"):
                     X, y = X.to(device), y.to(device)
-                    y = (y - float(mean_y)) / float(std_y)
 
                     mean = model(X)
                     loss = mse_loss(mean, y)

@@ -13,6 +13,16 @@ from scipy.stats import spearmanr
 from echo import *
 from model import HeteroscedasticEFModel
 
+def fgsm_attack(inputs, targets, model, epsilon, std_y):
+    inputs = inputs.clone().detach().requires_grad_(True)
+    mean, _, _ = model(inputs)
+    mean = mean * float(std_y)  # denormalize
+    loss = torch.nn.functional.mse_loss(mean[:, 0], targets)
+    loss.backward()
+    perturbation = epsilon * inputs.grad.sign()
+    adv_inputs = inputs + perturbation
+    adv_inputs = torch.clamp(adv_inputs, 0, 1)  # Keep pixel values valid
+    return adv_inputs.detach()
 
 def main():
     parser = argparse.ArgumentParser()
@@ -82,7 +92,8 @@ def main():
                 for x, y in dataloader:
                     x, y = x.to(device), y.to(device)
                     #y = (y - float(mean_y)) / float(std_y)
-
+                    x = fgsm_attack(x, y, model, epsilon=args.epsilon, std_y=std_y)
+                    
                     mean, ep_var, var = model(x)
                     
                     mean = mean * float(std_y) + float(mean_y)

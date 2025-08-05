@@ -10,6 +10,7 @@ class EFModel(torch.nn.Module):
         self.base_model = base_model
 
         self.head = torch.nn.Linear(in_features, 1)
+        self.head.bias.data[0] = 55.6
 
     def forward(self, x):
         features = self.base_model(x)

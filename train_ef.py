@@ -23,7 +23,7 @@ def main():
     parser.add_argument('--pretrained', action='store_true')
     parser.add_argument('--weights', type=str, default=None)
     parser.add_argument('--num_epochs', type=int, default=45)
-    parser.add_argument('--batch_size', type=int, default=8)
+    parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--weight_decay', type=float, default=1e-4)
     parser.add_argument('--lr_step_period', type=int, default=15)
@@ -77,12 +77,14 @@ def main():
         for phase, loader in [('train', train_loader), ('val', val_loader)]:
             model.train(phase == 'train')
             running_loss, preds, targets = 0.0, [], []
+            loss = 0.0
+            
             with torch.set_grad_enabled(phase == 'train'):
-                for X, y in tqdm.tqdm(loader, desc=f"Epoch {epoch} [{phase}]"):
+                for X, y in tqdm.tqdm(loader, desc=f"Epoch {epoch} [{phase}] (loss={loss})"):
                     X, y = X.to(device), y.to(device)
 
                     mean = model(X)
-                    loss = mse_loss(mean, y)
+                    loss = torch.nn.functional.mse_loss(mean.view(-1), y)
 
                     if phase == 'train':
                         optim.zero_grad()

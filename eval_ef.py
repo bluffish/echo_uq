@@ -87,27 +87,26 @@ def main():
 
         preds, targets, al_vars, ep_vars, abs_errors = [], [], [], [], []
 
-        with torch.no_grad():
-            with tqdm.tqdm(total=len(dataloader)) as pbar:
-                for x, y in dataloader:
-                    x, y = x.to(device), y.to(device)
-                    #y = (y - float(mean_y)) / float(std_y)
-                    x = fgsm_attack(x, y, model, epsilon=args.epsilon, std_y=std_y)
-                    
-                    mean, ep_var, var = model(x)
-                    
-                    mean = mean * float(std_y) + float(mean_y)
-                    var = var * float(std_y) ** 2
+        with tqdm.tqdm(total=len(dataloader)) as pbar:
+            for x, y in dataloader:
+                x, y = x.to(device), y.to(device)
+                #y = (y - float(mean_y)) / float(std_y)
+                x = fgsm_attack(x, y, model, epsilon=0.2, std_y=std_y)
 
-                    print(var)
+                mean, ep_var, var = model(x)
+                
+                mean = mean * float(std_y) + float(mean_y)
+                var = var * float(std_y) ** 2
 
-                    preds.append(mean[:, 0].detach().cpu().numpy())
-                    targets.append(y.detach().cpu().numpy())
-                    al_vars.append(var[:, 0].detach().cpu().numpy())
-                    ep_vars.append(ep_var.detach().cpu().numpy())
-                    abs_errors.append(np.abs(mean[:, 0].detach().cpu().numpy() - y.detach().cpu().numpy()))
-                    pbar.update()
-                    
+                print(var)
+
+                preds.append(mean[:, 0].detach().cpu().numpy())
+                targets.append(y.detach().cpu().numpy())
+                al_vars.append(var[:, 0].detach().cpu().numpy())
+                ep_vars.append(ep_var.detach().cpu().numpy())
+                abs_errors.append(np.abs(mean[:, 0].detach().cpu().numpy() - y.detach().cpu().numpy()))
+                pbar.update()
+                
         preds = np.concatenate(preds)
         targets = np.concatenate(targets)
         al_vars = np.concatenate(al_vars)

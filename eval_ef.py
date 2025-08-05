@@ -98,12 +98,10 @@ def main():
                 mean = mean * float(std_y) + float(mean_y)
                 var = var * float(std_y) ** 2
 
-                print(var)
-
                 preds.append(mean[:, 0].detach().cpu().numpy())
                 targets.append(y.detach().cpu().numpy())
                 al_vars.append(var[:, 0].detach().cpu().numpy())
-                ep_vars.append(ep_var.detach().cpu().numpy())
+                ep_vars.append(ep_var[:, 0].detach().cpu().numpy())
                 abs_errors.append(np.abs(mean[:, 0].detach().cpu().numpy() - y.detach().cpu().numpy()))
                 pbar.update()
                 
@@ -117,6 +115,7 @@ def main():
         rmse = np.sqrt(sklearn.metrics.mean_squared_error(targets, preds))
 
         print(f"{split} R2: {r2:.3f}, MAE: {mae:.2f}, RMSE: {rmse:.2f}")
+        print(f"{split} Aleatoric variance: {al_vars.mean():.3f}, Epistemic variance: {np.mean(ep_vars):.3f}")
 
 #        with open(os.path.join(args.output, f"{split}_predictions.csv"), "w") as f:
 #            for fname, preds in zip(dataset.fnames, preds):

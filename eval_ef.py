@@ -8,10 +8,32 @@ import torchvision
 import tqdm
 import matplotlib.pyplot as plt
 import sklearn.metrics
-from scipy.stats import spearmanr
 
 from echo import *
-from model import HeteroscedasticEFModel
+from model import EFModel
+
+class EnsembleModel(torch.nn.Module):
+    def __init__(self, models):
+        super().__init__()
+        self.models = torch.nn.ModuleList(models)
+
+    def forward(self, x):
+        means = []
+        for model in self.models:
+            mean = model(x)
+            means.append(mean)
+        means = torch.stack(means, dim=0)
+        return means.mean(0), means.var(0)
+
+def load_model(path):
+    base = torchvision.models.video.__dict__[args.model_name](pretrained=False)
+    model = EFModel(base)
+    model = torch.nn.DataParallel(model).to(device)
+    checkpoint = torch.load(path)
+    model.load_state_dict(checkpoint['state_dict'])
+    print(checkpoint['epoch'])
+    model.eval()
+    return model
 
 def fgsm_attack(inputs, targets, model, epsilon, std_y):
     inputs = inputs.clone().detach().requires_grad_(True)
@@ -21,7 +43,7 @@ def fgsm_attack(inputs, targets, model, epsilon, std_y):
     loss.backward()
     perturbation = epsilon * inputs.grad.sign()
     adv_inputs = inputs + perturbation
-    adv_inputs = torch.clamp(adv_inputs, 0, 1)  # Keep pixel values valid
+    # adv_inputs = torch.clamp(adv_inputs, 0, 1)  # Keep pixel values valid
     return adv_inputs.detach()
 
 def main():
@@ -38,32 +60,8 @@ def main():
     parser.add_argument('--frames', type=int, default=32)
     parser.add_argument('--period', type=int, default=2)
     parser.add_argument('--num', type=int, default=1)
+    parser.add_argument('--eps', type=float, default=0)
     args = parser.parse_args()
-
-    class EnsembleModel(torch.nn.Module):
-        def __init__(self, models):
-            super().__init__()
-            self.models = torch.nn.ModuleList(models)
-
-        def forward(self, x):
-            means, log_vars = [], []
-            for model in self.models:
-                mean, log_var = model(x)
-                means.append(mean)
-                log_vars.append(log_var)
-            means = torch.stack(means, dim=0)
-            log_vars = torch.stack(log_vars, dim=0)
-            return means.mean(0), means.var(0), log_vars.mean(0)
-
-    def load_model(path):
-        base = torchvision.models.video.__dict__[args.model_name](pretrained=False)
-        model = HeteroscedasticEFModel(base)
-        model = torch.nn.DataParallel(model).to(device)
-        checkpoint = torch.load(path)
-        model.load_state_dict(checkpoint['state_dict'])
-        print(checkpoint['epoch'])
-        model.eval()
-        return model
 
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -85,29 +83,30 @@ def main():
         dataset = Echo(root=args.data_dir, split=split, **kwargs)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=False, pin_memory=(device.type == "cuda"))
 
-        preds, targets, al_vars, ep_vars, abs_errors = [], [], [], [], []
+        preds, targets, vars, abs_errors = [], [], [], []
 
         with tqdm.tqdm(total=len(dataloader)) as pbar:
             for x, y in dataloader:
                 x, y = x.to(device), y.to(device)
-                #y = (y - float(mean_y)) / float(std_y)
-                x = fgsm_attack(x, y, model, epsilon=0.2, std_y=std_y)
 
-                mean, ep_var, var = model(x)
+                if args.eps > 0:
+                    x = fgsm_attack(x, y, model, epsilon=args.eps, std_y=std_y)
+
+                mean, var = model(x)
                 
                 mean = mean * float(std_y) + float(mean_y)
-                var = var * float(std_y) ** 2
 
                 preds.append(mean[:, 0].detach().cpu().numpy())
                 targets.append(y.detach().cpu().numpy())
-                al_vars.append(var[:, 0].detach().cpu().numpy())
-                ep_vars.append(ep_var[:, 0].detach().cpu().numpy())
+                vars.append(var[:, 0].detach().cpu().numpy())
+
                 abs_errors.append(np.abs(mean[:, 0].detach().cpu().numpy() - y.detach().cpu().numpy()))
                 pbar.update()
                 
         preds = np.concatenate(preds)
         targets = np.concatenate(targets)
-        al_vars = np.concatenate(al_vars)
+        vars = np.concatenate(vars)
+
         abs_errors = np.concatenate(abs_errors)
 
         r2 = sklearn.metrics.r2_score(targets, preds)
@@ -115,17 +114,9 @@ def main():
         rmse = np.sqrt(sklearn.metrics.mean_squared_error(targets, preds))
 
         print(f"{split} R2: {r2:.3f}, MAE: {mae:.2f}, RMSE: {rmse:.2f}")
-        print(f"{split} Aleatoric variance: {al_vars.mean():.3f}, Epistemic variance: {np.mean(ep_vars):.3f}")
+        print(f"Epistemic variance: {np.mean(ep_vars):.3f}")
 
-#        with open(os.path.join(args.output, f"{split}_predictions.csv"), "w") as f:
-#            for fname, preds in zip(dataset.fnames, preds):
-#                for i, p in enumerate(preds):
-#                    f.write(f"{fname},{i},{p:.4f}\n")
-#
-        yhat_std = np.array([np.sqrt(v) for v in al_vars])  # mean aleatoric std per sample
-        print(targets.shape, preds.shape, yhat_std.shape)
         fig = plt.figure(figsize=(3, 3))
-        plt.errorbar(targets, preds, yerr=2 * yhat_std, fmt='o', markersize=2, ecolor='gray', alpha=0.5, capsize=2, label='±2σ')
         plt.plot([0, 100], [0, 100], linewidth=1, linestyle="--", color="red")
         plt.xlabel("Actual EF (%)")
         plt.ylabel("Predicted EF (%)")
@@ -134,13 +125,6 @@ def main():
         plt.tight_layout()
         plt.savefig(os.path.join(args.output, f"{split}_scatter_uncertainty.pdf"))
         plt.close(fig)
-
-        spearman_corr, spearman_p = spearmanr(yhat_std, abs_errors)
-        print(f"{split} Spearman correlation between uncertainty and absolute error: r = {spearman_corr:.3f}, p = {spearman_p:.3g}")
-
-        # Optional: Pearson correlation as well
-        pearson_corr = np.corrcoef(yhat_std, abs_errors)[0, 1]
-        print(f"{split} Pearson correlation between uncertainty and absolute error: r = {pearson_corr:.3f}")
 
 
 if __name__ == '__main__':

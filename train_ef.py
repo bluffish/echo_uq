@@ -44,7 +44,8 @@ def main():
     np.random.seed(args.seed)
 
     base_model = torchvision.models.video.__dict__[args.model_name](pretrained=args.pretrained)
-    model = HeteroscedasticEFModel(base_model)
+    model = EFModel(base_model)
+
     if device.type == 'cuda':
         model = torch.nn.DataParallel(model)
     model.to(device)
@@ -73,9 +74,7 @@ def main():
     print(f"Mean: {mean_y}, Std: {std_y}")
 
     for epoch in range(args.num_epochs):
-        for phase, loader in [('val', val_loader), ('train', train_loader)]:
-
-        # for phase, loader in [('train', train_loader), ('val', val_loader)]:
+        for phase, loader in [('train', train_loader), ('val', val_loader)]:
             model.train(phase == 'train')
             running_loss, preds, targets = 0.0, [], []
             with torch.set_grad_enabled(phase == 'train'):
@@ -83,9 +82,8 @@ def main():
                     X, y = X.to(device), y.to(device)
                     y = (y - float(mean_y)) / float(std_y)
 
-                    mean, var = model(X)
-                    loss = beta_nll_loss(mean, var, y)
-
+                    mean = model(X)
+                    loss = mse_loss(mean, y)
 
                     if phase == 'train':
                         optim.zero_grad()

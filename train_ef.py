@@ -23,7 +23,7 @@ def main():
     parser.add_argument('--pretrained', action='store_true')
     parser.add_argument('--weights', type=str, default=None)
     parser.add_argument('--num_epochs', type=int, default=45)
-    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--batch_size', type=int, default=20)
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--weight_decay', type=float, default=1e-4)
     parser.add_argument('--lr_step_period', type=int, default=15)
@@ -57,7 +57,7 @@ def main():
     scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=args.lr_step_period)
 
     mean_ds, std_ds = get_mean_and_std(Echo(root=args.data_dir, split="train"))
-    kwargs = {"target_type": "EF", "mean": mean_ds, "std": std_ds, "length": args.frames, "period": args.period, 'clips': "all"}
+    kwargs = {"target_type": "EF", "mean": mean_ds, "std": std_ds, "length": args.frames, "period": args.period}
 
     train_loader = torch.utils.data.DataLoader(
         Echo(root=args.data_dir, split="train", pad=12, **kwargs),

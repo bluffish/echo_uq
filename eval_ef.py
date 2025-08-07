@@ -113,7 +113,7 @@ def main():
         rmse = np.sqrt(sklearn.metrics.mean_squared_error(targets, preds))
 
         print(f"{split} R2: {r2:.3f}, MAE: {mae:.2f}, RMSE: {rmse:.2f}")
-        print(f"Epistemic variance: {np.mean(ep_vars):.3f}")
+        print(f"Epistemic variance: {np.mean(vars):.3f}")
 
         fig = plt.figure(figsize=(3, 3))
         plt.plot([0, 100], [0, 100], linewidth=1, linestyle="--", color="red")

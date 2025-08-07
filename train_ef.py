@@ -93,9 +93,7 @@ def main():
                     running_loss += loss.item() * X.size(0)
                     preds.append(mean.detach().cpu().numpy())
                     targets.append(y.detach().cpu().numpy())
-                    
-                    print(loss.item())
-                    
+                                        
             scheduler.step() if phase == 'train' else None
 
             preds = np.concatenate(preds)

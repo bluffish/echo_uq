@@ -25,16 +25,6 @@ class EnsembleModel(torch.nn.Module):
         means = torch.stack(means, dim=0)
         return means.mean(0), means.var(0)
 
-def load_model(path):
-    base = torchvision.models.video.__dict__[args.model_name](pretrained=False)
-    model = EFModel(base)
-    model = torch.nn.DataParallel(model).to(device)
-    checkpoint = torch.load(path)
-    model.load_state_dict(checkpoint['state_dict'])
-    print(checkpoint['epoch'])
-    model.eval()
-    return model
-
 def fgsm_attack(inputs, targets, model, epsilon, std_y):
     inputs = inputs.clone().detach().requires_grad_(True)
     mean, _, _ = model(inputs)
@@ -62,6 +52,17 @@ def main():
     parser.add_argument('--num', type=int, default=1)
     parser.add_argument('--eps', type=float, default=0)
     args = parser.parse_args()
+
+    def load_model(path):
+        base = torchvision.models.video.__dict__[args.model_name](pretrained=False)
+        model = EFModel(base)
+        model = torch.nn.DataParallel(model).to(device)
+        checkpoint = torch.load(path)
+        model.load_state_dict(checkpoint['state_dict'])
+        print(checkpoint['epoch'])
+        model.eval()
+        return model
+
 
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)

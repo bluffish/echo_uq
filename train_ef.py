@@ -57,7 +57,7 @@ def main():
     scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=args.lr_step_period)
 
     mean_ds, std_ds = get_mean_and_std(Echo(root=args.data_dir, split="train"))
-    kwargs = {"target_type": "EF", "mean": mean_ds, "std": std_ds, "length": args.frames, "period": args.period}
+    kwargs = {"target_type": "EF", "mean": mean_ds, "std": std_ds, "length": args.frames, "period": args.period, 'clips': "all"}
 
     train_loader = torch.utils.data.DataLoader(
         Echo(root=args.data_dir, split="train", pad=12, **kwargs),
